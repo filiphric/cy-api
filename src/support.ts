@@ -1,7 +1,12 @@
 /// <reference types="cypress" />
 
 import { html } from 'common-tags';
-import hljs from 'highlight.js';
+import { formatRequest } from './utils/formatRequest';
+import { formatResponse } from './utils/formatResponse';
+import { getContainer } from './utils/getContainer';
+import { addOnClickFilter } from './utils/addOnClickFilter';
+import { printResponse } from './printResponse';
+
 const pack = require('../package.json');
 
 //
@@ -10,7 +15,7 @@ const pack = require('../package.json');
 //
 
 // shortcuts to a few Lodash methods
-const { get, filter, map, uniq } = Cypress._
+const { get } = Cypress._
 
 let firstApiRequest: boolean
 
@@ -78,32 +83,32 @@ Cypress.Commands.add('api', (options: Partial<Cypress.RequestOptions>, name = 'a
       // remove existing content from the application frame
       firstApiRequest = false
       container.innerHTML = html`
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/${pack['dependencies']['highlight.js']}/styles/vs.min.css">
-      <style>
-      .container { background-color: rgb(238, 238, 238); border-radius: 6px; padding: 30px 15px; text-align: center; }
-        .cy-api {
-          text-align: left;
-        }
-        .cy-api-request {
-          font-weight: 600;
-        }
-        .cy-api-logs-messages {
-          text-align: left;
-          max-height: 25em;
-          overflow-y: scroll;
-          background-color: lightyellow;
-          padding: 4px;
-          border-radius: 4px;
-        }
-        .cy-api-response {
-          text-align: left;
-          margin-top: 1em;
-        }
-        .hljs {
-          background: rgb(238, 238, 238);
-        }
-      </style>
-    `
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/${pack['dependencies']['highlight.js']}/styles/base16/bright.min.css">
+        <style>
+        .container { background-color: rgb(238, 238, 238); border-radius: 6px; padding: 30px 15px; text-align: center; }
+          .cy-api {
+            text-align: left;
+          }
+          .cy-api-request {
+            font-weight: 600;
+          }
+          .cy-api-logs-messages {
+            text-align: left;
+            max-height: 25em;
+            overflow-y: scroll;
+            background-color: lightyellow;
+            padding: 4px;
+            border-radius: 4px;
+          }
+          .cy-api-response {
+            text-align: left;
+            margin-top: 1em;
+          }
+          .hljs {
+            background: rgb(238, 238, 238);
+          }
+        </style>
+      `
     } else {
       container.innerHTML += '<br><hr>\n'
       topMargin = '1em'
@@ -176,140 +181,3 @@ Cypress.Commands.add('api', (options: Partial<Cypress.RequestOptions>, name = 'a
   })
 })
 
-const printResponse = (container: HTMLElement, hasApiMessages: boolean, messagesEndpoint: string, normalizedTypes: string[], normalizedNamespaces: string[], displayRequest = true) => {
-  let messages: Message[] = [];
-  if (hasApiMessages) {
-    return cy.request({
-      url: messagesEndpoint,
-      log: false,
-      failOnStatusCode: false // maybe there is no endpoint with logs
-    }).then(res => {
-      messages = get(res, 'body.messages', [])
-      if (messages.length) {
-        const types = uniq(map(messages, 'type')).sort()
-        // types will be like
-        // ['console', 'debug', 'util.debuglog']
-        const namespaces = types.map(type => {
-          return {
-            type,
-            namespaces: uniq(
-              map(filter(messages, { type }), 'namespace')
-            ).sort()
-          }
-        })
-        // namespaces will be like
-        // [
-        //  {type: 'console', namespaces: ['log']},
-        //  {type: 'util.debuglog', namespaces: ['HTTP']}
-        // ]
-        if (displayRequest) {
-          container.innerHTML +=
-            '<hr>\n' + '<div style="text-align: left">\n' + `<b>Server logs</b>`
-
-          if (types.length) {
-            for (const type of types) {
-              const normalizedType = normalize(type)
-              normalizedTypes.push(normalizedType)
-              container.innerHTML += `\n<input type="checkbox" id="check-${normalizedType}" checked name="${type}" value="${normalizedType}"> ${type}`
-            }
-            container.innerHTML += '<br/>\n'
-          }
-          if (namespaces.length) {
-            container.innerHTML +=
-              '\n' +
-              namespaces
-                .map(n => {
-                  if (!n.namespaces.length) {
-                    return ''
-                  }
-                  return n.namespaces
-                    .map(namespace => {
-                      const normalizedNamespace = normalize(n.type, namespace)
-                      normalizedNamespaces.push(normalizedNamespace)
-                      return `\n<input type="checkbox" name="${n.type}.${namespace}"
-                        id="check-${normalizedNamespace}" checked
-                        value="${normalizedNamespace}"> ${n.type}.${namespace}`
-                    })
-                    .join('')
-                })
-                .join('') +
-              '<br/>\n'
-          }
-
-          container.innerHTML +=
-            '\n<pre class="cy-api-logs-messages">' +
-            messages
-              .map(m => `<div class="${normalize(m.type)} ${normalize(m.type, m.namespace)}">${m.type} ${m.namespace}: ${m.message}</div>`)
-              .join('') +
-            '\n</pre></div>'
-        }
-      }
-    }).then(() => cy.wrap({ messages }, { log: false }))
-  } else {
-    return cy.wrap({ messages }, { log: false })
-  }
-}
-
-const normalize = (type: string, namespace: string | null = null): string => {
-  let normalized = type.replace('.', '-')
-  if (namespace) {
-    namespace = namespace.replace('.', '-')
-    normalized += `-${namespace}`
-  }
-  return normalized
-}
-
-const addOnClickFilter = (filterId: string): void => {
-  // @ts-ignore
-  const doc = cy.state('document')
-  doc.getElementById(`check-${filterId}`).onclick = () => {
-    const checkbox = doc.getElementById(`check-${filterId}`)
-    const elements = doc.getElementsByClassName(checkbox.value)
-    for (let log of elements) {
-      log.style.display = checkbox.checked ? 'block' : 'none'
-    }
-  }
-}
-
-const getContainer = () => {
-  // @ts-ignore
-  const doc: Document = cy.state('document');
-  // @ts-ignore
-  const win: Window = cy.state('window');
-  let container = doc.querySelector<HTMLElement>('.container');
-  if (!container) {
-    container = doc.createElement('div');
-    container.className = 'container';
-    doc.body.appendChild(container);
-  }
-  container.className = 'container';
-  return { container, win, doc };
-}
-
-const formatJSon = (jsonObject: object) => {
-  return hljs.highlight(JSON.stringify(jsonObject, null, 4), { language: 'json' }).value
-}
-
-const formatRequest = (options: Partial<Cypress.RequestOptions>) => {
-  const showCredentials = Cypress.env('API_SHOW_CREDENTIALS');
-  const auth = options?.auth as { username?: string, password?: string }
-  const hasPassword = auth?.password;
-  if (!showCredentials && hasPassword) {
-    return formatJSon({
-      ...options,
-      auth: {
-        ...options.auth,
-        password: '*****'
-      }
-    })
-  }
-  return formatJSon(options);
-}
-
-const formatResponse = (body: object, headers: { [key: string]: string | string[] }) => {
-  if (headers?.['content-type']?.includes('application/json')) {
-    return formatJSon(body);
-  } else {
-    return body;
-  }
-}
