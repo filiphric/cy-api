@@ -39,7 +39,7 @@ function initApiOptions(): ApiOptions {
   }
 }
 
-Cypress.Commands.add('api', (options: Partial<Cypress.RequestOptions>, name = 'api') => {
+Cypress.Commands.add('api', (options: Partial<Cypress.RequestOptions>, name) => {
 
   const apiOptions = initApiOptions();
   const hasApiMessages = Cypress.env('API_MESSAGES') === false ? false : true
@@ -65,7 +65,7 @@ Cypress.Commands.add('api', (options: Partial<Cypress.RequestOptions>, name = 'a
   // should we log the message before a request
   // in case it fails?
   Cypress.log({
-    name,
+    name: name || 'api',
     message: options.url,
     consoleProps() {
       return {
@@ -119,7 +119,7 @@ Cypress.Commands.add('api', (options: Partial<Cypress.RequestOptions>, name = 'a
     container.innerHTML +=
       // should we use custom class and insert class style?
       '<div class="cy-api">\n' +
-      `<h1 class="cy-api-request" style="margin: ${topMargin} 0 1em">Cy-api: ${name}</h1>\n` +
+      `<h1 class="cy-api-request" style="margin: ${topMargin} 0 1em">Cy-api: ${name || Cypress.currentTest.title}</h1>\n` +
       '<div>\n' +
       '<b>Request:</b>\n' +
       '<pre class="hljs">' +
