@@ -83,7 +83,7 @@ Cypress.Commands.add('api', (options: Partial<Cypress.RequestOptions>, name) => 
       // remove existing content from the application frame
       firstApiRequest = false
       container.innerHTML = html`
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/${pack['dependencies']['highlight.js']}/styles/base16/bright.min.css">
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/${pack['dependencies']['highlight.js']}/styles/vs.min.css">
         <style>
         .container { background-color: rgb(238, 238, 238); border-radius: 6px; padding: 30px 15px; text-align: center; }
           .cy-api {
